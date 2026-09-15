@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Memory Is the Harness</title>
+<title>Memory Is the Harness: Probabilistic State for AI Coding Assistants</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&display=swap">
@@ -25,13 +25,13 @@
     </nav>
   </header>
 
-  <h1>Memory Is the Harness: Why AI Coding Assistants Need Probabilistic State</h1>
+  <h1>Memory Is the Harness: Probabilistic State for AI Coding Assistants</h1>
   <div class="meta">September 2026 &middot; <a href="https://github.com/LohitJaga/gaussian-memory-worker">gaussian-memory-worker</a></div>
 
   <article>
     <p>I told Claude the cron job was fixed. Three weeks earlier I'd told it the job was broken. It stored both, weighted them identically, and handed back whichever one happened to sit closer in vector space to my next prompt.</p>
 
-    <p>That's the state of memory in developer tools. It isn't that coding agents have amnesia. It's that they remember every statement equally, forever, with no concept of time, contradiction, or decay.</p>
+    <p>That's what memory looks like in the tools I've used, Claude Code, Cursor, and the memory layers built into agent frameworks like Mem0 and Zep. Not that coding agents have amnesia. It's that they remember every statement equally, forever, with no concept of time, contradiction, or decay.</p>
 
     <p><strong>Gaussian Memory</strong> is an MCP server that gives Claude Code, Cursor, OpenCode and Zed persistent memory across sessions. It runs entirely inside your own Cloudflare account, on the free tier. It treats a memory not as a row in a document store but as an observation with a confidence distribution that moves.</p>
 
@@ -44,7 +44,7 @@
 
     <h2>The bottleneck moved</h2>
 
-    <p>Base model intelligence is commoditizing into a utility. Whether the thing in your editor is Claude, a hosted GLM, or a quantized Llama running under an open harness, the frontier model is no longer what separates a good agent session from a useless one.</p>
+    <p>In my own experience switching between Claude, a hosted GLM, and a quantized Llama running under an open harness, which model sits behind the editor matters less than it used to. All three hit the same wall.</p>
 
     <p>The bottleneck is state: giving an agent an accurate, evolving model of your system across hundreds of sessions without stuffing the context window with garbage.</p>
 
@@ -67,6 +67,8 @@
     <p>Semantic search is good when you know what you're asking. "What did I decide about session storage" retrieves correctly, because the query and the stored text share most of their meaning.</p>
 
     <p>Real sessions don't open that way. They open with "where was I" or "what's left on the auth thing." Four words, no semantic anchor. Against a store of four thousand memories, those four words are roughly equidistant from everything you have ever worked on. Cosine similarity there isn't weak signal. It's noise.</p>
+
+    <p>On my own gold-set benchmark, a plain cosine baseline gets 38 percent recall on queries phrased that vaguely. The confidence-weighted version gets 83 percent. On queries with real semantic anchor, exact phrasing or a close paraphrase, cosine alone already does fine: 92 and 100 percent recall, and the confidence layer barely moves the number. That gap is the whole argument. The mechanism does nothing on precise queries and everything on the vague ones.</p>
 
     <p>So something other than the embedding has to do the ranking.</p>
 
