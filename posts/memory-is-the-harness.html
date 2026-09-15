@@ -74,7 +74,7 @@
 
     <h2>Modeling memory as uncertainty</h2>
 
-    <p>Every memory carries a confidence spread: one &sigma; per memory, stored as a diagonal over the embedding. Retrieval computes an ordinary hybrid score first:</p>
+    <p>Every memory carries a confidence spread: one &sigma; per memory, stored as a diagonal over the embedding. That representation is what lets reinforcement, decay, and merging share a common state: confidence can contract, expand, or combine without ever rewriting the underlying memory. Retrieval computes an ordinary hybrid score first:</p>
 
     <pre><code class="language-plaintext">base = 0.50&middot;cosine + 0.15&middot;bm25 + 0.27&middot;recency + 0.08&middot;access_frequency</code></pre>
 
