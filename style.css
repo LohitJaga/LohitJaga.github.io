@@ -29,8 +29,9 @@ h1{font-family:"IBM Plex Serif",Georgia,serif;font-weight:600;font-size:clamp(28
  letter-spacing:-.015em;margin:0 0 10px;text-wrap:balance}
 .meta{font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--ink-faint);letter-spacing:.02em;margin-bottom:40px}
 
-article h2{font-family:"IBM Plex Serif",Georgia,serif;font-size:23px;font-weight:600;letter-spacing:-.01em;margin:44px 0 14px;
+article h2,section.block h2{font-family:"IBM Plex Serif",Georgia,serif;font-size:23px;font-weight:600;letter-spacing:-.01em;margin:44px 0 14px;
  border-left:3px solid var(--sharp);padding-left:14px}
+section.block:first-of-type h2{margin-top:0}
 article p{margin:0 0 18px;color:var(--ink-soft)}
 article strong{color:var(--ink);font-weight:600}
 article code{font-family:"IBM Plex Mono",monospace;font-size:.88em;background:var(--code-bg);padding:1px 5px;border-radius:3px;color:var(--ink)}
@@ -46,8 +47,12 @@ article li{margin-bottom:6px}
 .postlist a:hover{color:var(--sharp)}
 .postlist .date{display:block;font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-faint);margin-top:4px}
 
-.intro{color:var(--ink-soft);max-width:56ch;margin:0 0 40px;font-size:15.5px}
+.intro{color:var(--ink-soft);max-width:56ch;margin:0 0 24px;font-size:15.5px}
 .intro a{color:var(--sharp)}
+
+.linklist{list-style:none;display:flex;gap:18px;padding:0;margin:0 0 48px;
+ font-family:"IBM Plex Mono",monospace;font-size:13px}
+.linklist a{color:var(--sharp);text-decoration:underline}
 
 .explist{list-style:none;padding:0;margin:0 0 40px;display:flex;flex-direction:column;gap:0}
 .explist li{border-bottom:1px solid var(--rule-soft);padding:20px 0}
