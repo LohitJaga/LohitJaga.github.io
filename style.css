@@ -49,6 +49,18 @@ article li{margin-bottom:6px}
 .intro{color:var(--ink-soft);max-width:56ch;margin:0 0 40px;font-size:15.5px}
 .intro a{color:var(--sharp)}
 
+.explist{list-style:none;padding:0;margin:0 0 40px;display:flex;flex-direction:column;gap:0}
+.explist li{border-bottom:1px solid var(--rule-soft);padding:20px 0}
+.explist li:first-child{padding-top:0}
+.exp-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.exp-role{font-family:"IBM Plex Serif",Georgia,serif;font-size:17px;color:var(--ink);font-weight:600}
+.exp-org{color:var(--ink-soft)}
+.exp-when{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-faint);white-space:nowrap}
+.exp-desc{margin-top:6px;color:var(--ink-soft);font-size:15px}
+
+section.block{margin-bottom:44px}
+section.block .eyebrow{margin-bottom:14px}
+
 footer.site{margin-top:64px;padding-top:24px;border-top:1px solid var(--rule);font-family:"IBM Plex Mono",monospace;
  font-size:12px;color:var(--ink-faint);display:flex;gap:16px}
 footer.site a{color:var(--ink-faint)}
