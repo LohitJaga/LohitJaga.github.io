@@ -31,7 +31,7 @@
   <article>
     <p>I told Claude the cron job was fixed. Three weeks earlier I'd told it the job was broken. It stored both, weighted them identically, and handed back whichever one happened to sit closer in vector space to my next prompt.</p>
 
-    <p>That's what memory looks like in the tools I've used, Claude Code, Cursor, and the memory layers built into agent frameworks like Mem0 and Zep. Not that coding agents have amnesia. It's that they remember every statement equally, forever, with no concept of time, contradiction, or decay.</p>
+    <p>That's what memory looks like in the tools I've used, Claude Code, Cursor, the memory layers in Mem0 and Zep. They don't forget anything, that's actually the problem. Everything gets remembered equally, forever, with no sense of what's still true.</p>
 
     <p><strong>Gaussian Memory</strong> is an MCP server that gives Claude Code, Cursor, OpenCode and Zed persistent memory across sessions. It runs entirely inside your own Cloudflare account, on the free tier. It treats a memory not as a row in a document store but as an observation with a confidence distribution that moves.</p>
 
@@ -40,7 +40,7 @@
     <pre><code class="language-plaintext">[1.72] (cloudflare-project &uarr;/decision) 2mo ago &bull; Use Workers + D1 + Vectorize. Alternatives considered: Supabase, Railway, self-hosted Postgres
 [1.50] (benchmark-project &uarr;/decision) 2w ago &bull; Retrieve hook 3.5-4.2s on Windows, blocks UserPromptSubmit. Cause still unidentified</code></pre>
 
-    <p>That is real output from my own store. Nothing prompted the second line, and nobody tagged it as open. It is the landmine you'd otherwise step on at 2am.</p>
+    <p>That's real output from my own store. I never prompted the second line and never tagged it as open, it's just sitting there waiting to be the landmine I step on at 2am.</p>
 
     <h2>The bottleneck moved</h2>
 
@@ -48,7 +48,7 @@
 
     <p>The bottleneck is state: giving an agent an accurate, evolving model of your system across hundreds of sessions without stuffing the context window with garbage.</p>
 
-    <p>Your repository is a complete record of what your code does and a terrible record of why. It contains nothing about:</p>
+    <p>Your repository tells the model what your code does. It doesn't tell it why. It contains nothing about:</p>
 
     <ul>
       <li>the migration that is 60% done and breaks if anything touches it</li>
@@ -66,9 +66,9 @@
 
     <p>Semantic search is good when you know what you're asking. "What did I decide about session storage" retrieves correctly, because the query and the stored text share most of their meaning.</p>
 
-    <p>Real sessions don't open that way. They open with "where was I" or "what's left on the auth thing." Four words, no semantic anchor. Against a store of four thousand memories, those four words are roughly equidistant from everything you have ever worked on. Cosine similarity there isn't weak signal. It's noise.</p>
+    <p>Real sessions don't open that way. They open with "where was I" or "what's left on the auth thing." Four words, no semantic anchor. Against a store of four thousand memories, those four words are roughly equidistant from everything you have ever worked on, so cosine similarity there isn't weak signal, it's noise.</p>
 
-    <p>On my own gold-set benchmark, a plain cosine baseline gets 38 percent recall on queries phrased that vaguely. The confidence-weighted version gets 83 percent. On queries with real semantic anchor, exact phrasing or a close paraphrase, cosine alone already does fine: 92 and 100 percent recall, and the confidence layer barely moves the number. That gap is the whole argument. The mechanism does nothing on precise queries and everything on the vague ones.</p>
+    <p>On my own gold-set benchmark, a plain cosine baseline gets 38 percent recall on queries phrased that vaguely. The confidence-weighted version gets 83 percent. On queries with real semantic anchor, exact phrasing or a close paraphrase, cosine alone already does fine: 92 and 100 percent recall, and the confidence layer barely moves the number. The mechanism does nothing on precise queries and everything on the vague ones, which is exactly the gap I built it to close.</p>
 
     <p>So something other than the embedding has to do the ranking.</p>
 
@@ -80,7 +80,7 @@
 
     <p>Dense vector search and FTS5 keyword search run in parallel and are fused by reciprocal rank fusion (k=60) before any of that is scored. A few smaller terms sit on top too, entity overlap, cluster cohesion, a temporal boost, but that's the shape of it.</p>
 
-    <p>The part that isn't ordinary is what happens next. The base score is multiplied by a <strong>Bhattacharyya term</strong>, clamped to <code>[0.70, 1.40]</code>, that compares the sharpness of the query's distribution against each candidate memory's. A memory the system is still confident about gets boosted by up to 40%. The clamp's lower bound is 0.70, though across the range the inputs actually reach it bottoms out nearer 0.87, so in practice it acts as a boost rather than a penalty.</p>
+    <p>The part that isn't ordinary is what happens next. The base score gets multiplied by a <strong>Bhattacharyya term</strong> that compares the sharpness of the query's distribution against each candidate memory's, clamped to <code>[0.70, 1.40]</code>. A memory the system is still confident about gets boosted by up to 40%. In practice the multiplier rarely drops below about 0.87 on the data I've run through it, so day to day it behaves more like a boost than a penalty, even though the clamp technically allows one.</p>
 
     <p>Three things move that distribution:</p>
 
@@ -90,7 +90,7 @@
 
     <p><strong>Merging.</strong> When two memories are close enough in distribution space, they combine via a Kalman update instead of sitting as duplicates. Two independent observations of the same fact produce higher combined confidence than either had alone.</p>
 
-    <p>This is why the mechanism matters exactly where it matters. On a precise query with strong word overlap, cosine and BM25 dominate and the multiplier is a rounding error. On "where was I," cosine is flat across the corpus and the confidence term is the only signal left with an opinion. It is bounded, though: it can lift a score by at most 40%, and the hard &sigma; ceiling applied above the scoring ends up doing more of the work than the multiplier does.</p>
+    <p>On a precise query with strong word overlap, cosine and BM25 dominate and the multiplier barely registers. On "where was I," cosine is flat across the corpus, so the confidence term ends up being the only signal that still has an opinion. Even there it's bounded to a 40% lift, and the hard &sigma; ceiling does more of the real work than the multiplier does.</p>
 
     <h2>Contradictions get resolved, not accumulated</h2>
 
