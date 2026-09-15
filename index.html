@@ -13,24 +13,74 @@
 <body>
 <div class="wrap">
   <header class="site">
-    <a class="site-name" href="/">Lohit Jagarlamudi</a>
-    <nav class="site-nav">
-      <a href="/">Writing</a>
-      <a href="/about.html">About</a>
-      <a href="https://github.com/LohitJaga">GitHub</a>
-      <a href="https://x.com/lj25064">Twitter</a>
-    </nav>
+    <h1>Lohit Jagarlamudi</h1>
   </header>
 
-  <h1>Writing</h1>
-  <p class="intro">Hi, I'm Lohit, a senior at Purdue. I build memory and agent infrastructure, mostly on Cloudflare.</p>
+  <p class="intro">Hi, I'm Lohit, a senior at Purdue. I'm interested in AI, particularly memory for AI agents. Here's what I write about it.</p>
 
-  <ul class="postlist">
-    <li>
-      <a href="/posts/memory-is-the-harness.html">Memory Is the Harness: Why AI Coding Assistants Need Probabilistic State</a>
-      <span class="date">September 2026</span>
-    </li>
+  <ul class="linklist">
+    <li><a href="https://github.com/LohitJaga">GitHub</a></li>
+    <li><a href="https://x.com/lj25064">Twitter</a></li>
+    <li><a href="https://www.linkedin.com/in/lohit-jagarlamudi/">LinkedIn</a></li>
   </ul>
+
+  <section class="block" id="writing">
+    <h2>Writing</h2>
+    <ul class="postlist">
+      <li>
+        <a href="/posts/memory-is-the-harness.html">Memory Is the Harness: Why AI Coding Assistants Need Probabilistic State</a>
+        <span class="date">September 2026</span>
+      </li>
+    </ul>
+  </section>
+
+  <section class="block" id="about">
+    <h2>About</h2>
+    <p class="intro">I'm a senior at Purdue studying CS and Applied Statistics, graduating December 2026. Most of what I build lives somewhere between AI infrastructure and data pipelines, on teams that need the actual thing working, not just a demo.</p>
+
+    <div class="eyebrow" style="margin-bottom:14px">Experience</div>
+    <ul class="explist">
+      <li>
+        <div class="exp-head">
+          <span><span class="exp-role">Undergraduate Researcher</span> &middot; <span class="exp-org">Duality Labs, Purdue</span></span>
+          <span class="exp-when">Aug 2026 &ndash; present</span>
+        </div>
+        <div class="exp-desc">Researching under Prof. James Davis on memory safety verification, using loop invariants (properties proven to hold across every iteration of a loop) as the mechanism.</div>
+      </li>
+      <li>
+        <div class="exp-head">
+          <span><span class="exp-role">Data Science GenAI Intern</span> &middot; <span class="exp-org">L'Or&eacute;al</span></span>
+          <span class="exp-when">May &ndash; Aug 2026</span>
+        </div>
+        <div class="exp-desc">Built a 5-agent AI platform on GCP (Vertex AI, BigQuery) behind one chat interface, automating sales, inventory, and marketing workflows with self-correcting SQL.</div>
+      </li>
+      <li>
+        <div class="exp-head">
+          <span><span class="exp-role">Researcher</span> &middot; <span class="exp-org">Bayer Crop Science, The Data Mine</span></span>
+          <span class="exp-when">Aug 2025 &ndash; May 2026</span>
+        </div>
+        <div class="exp-desc">Built the dataset pipeline joining genetics, weather, soil, and UAV imagery for maize yield prediction, including the plot-level join across sources that didn't share a key.</div>
+      </li>
+      <li>
+        <div class="exp-head">
+          <span><span class="exp-role">Data Science Intern</span> &middot; <span class="exp-org">Pico Quantitative Trading</span></span>
+          <span class="exp-when">Summer 2025</span>
+        </div>
+        <div class="exp-desc">Built the pipeline turning years of product chat logs into a training corpus for an internal LLM, filtering confidential messages and pairing questions with their answers via retrieval.</div>
+      </li>
+    </ul>
+
+    <div class="eyebrow" style="margin:28px 0 14px">Projects</div>
+    <ul class="explist">
+      <li>
+        <div class="exp-head">
+          <span><span class="exp-role">Gaussian Memory</span></span>
+          <span class="exp-when">2026 &middot; <a href="https://github.com/LohitJaga/gaussian-memory-worker">repo</a></span>
+        </div>
+        <div class="exp-desc">An MCP server giving AI coding assistants memory across sessions, where each memory carries a confidence score instead of being treated as permanently true. Self-hosted on Cloudflare.</div>
+      </li>
+    </ul>
+  </section>
 </div>
 </body>
 </html>
