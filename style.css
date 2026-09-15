@@ -16,7 +16,7 @@ body{
  background:var(--ground);color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;
  font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased;
 }
-.wrap{max-width:700px;margin:0 auto;padding:0 24px 96px}
+.wrap{max-width:860px;margin:0 auto;padding:0 24px 96px}
 a{color:var(--sharp)}
 header.site{padding:56px 0 32px;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:10px;margin-bottom:40px}
 .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)}
@@ -32,6 +32,7 @@ h1{font-family:"IBM Plex Serif",Georgia,serif;font-weight:600;font-size:clamp(28
 article h2,section.block h2{font-family:"IBM Plex Serif",Georgia,serif;font-size:23px;font-weight:600;letter-spacing:-.01em;margin:44px 0 14px;
  border-left:3px solid var(--sharp);padding-left:14px}
 section.block:first-of-type h2{margin-top:0}
+article{max-width:700px}
 article p{margin:0 0 18px;color:var(--ink-soft)}
 article strong{color:var(--ink);font-weight:600}
 article code{font-family:"IBM Plex Mono",monospace;font-size:.88em;background:var(--code-bg);padding:1px 5px;border-radius:3px;color:var(--ink)}
@@ -47,7 +48,7 @@ article li{margin-bottom:6px}
 .postlist a:hover{color:var(--sharp)}
 .postlist .date{display:block;font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-faint);margin-top:4px}
 
-.intro{color:var(--ink-soft);max-width:56ch;margin:0 0 24px;font-size:15.5px}
+.intro{color:var(--ink-soft);max-width:62ch;margin:0 0 24px;font-size:15.5px}
 .intro a{color:var(--sharp)}
 
 .linklist{list-style:none;display:flex;gap:18px;padding:0;margin:0 0 48px;
@@ -61,7 +62,7 @@ article li{margin-bottom:6px}
 .exp-role{font-family:"IBM Plex Serif",Georgia,serif;font-size:17px;color:var(--ink);font-weight:600}
 .exp-org{color:var(--ink-soft)}
 .exp-when{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-faint);white-space:nowrap}
-.exp-desc{margin-top:6px;color:var(--ink-soft);font-size:15px}
+.exp-desc{margin-top:6px;color:var(--ink-soft);font-size:15px;max-width:62ch}
 
 section.block{margin-bottom:44px}
 section.block .eyebrow{margin-bottom:14px}
