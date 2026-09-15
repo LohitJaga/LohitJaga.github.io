@@ -8,6 +8,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&display=swap">
 <link rel="stylesheet" href="/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231F6F66'/%3E%3Cpath d='M4 24 C 10 24, 12 8, 16 8 C 20 8, 22 24, 28 24' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-light.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" media="(prefers-color-scheme: dark)">
 </head>
 <body>
 <div class="wrap">
@@ -32,7 +35,7 @@
 
     <p>Here's what it puts into context on a prompt as vague as "where was I":</p>
 
-    <pre><code>[1.72] (cloudflare-project &uarr;/decision) 2mo ago &bull; Use Workers + D1 + Vectorize. Alternatives considered: Supabase, Railway, self-hosted Postgres
+    <pre><code class="language-plaintext">[1.72] (cloudflare-project &uarr;/decision) 2mo ago &bull; Use Workers + D1 + Vectorize. Alternatives considered: Supabase, Railway, self-hosted Postgres
 [1.50] (benchmark-project &uarr;/decision) 2w ago &bull; Retrieve hook 3.5-4.2s on Windows, blocks UserPromptSubmit. Cause still unidentified</code></pre>
 
     <p>That is real output from my own store. Nothing prompted the second line, and nobody tagged it as open. It is the landmine you'd otherwise step on at 2am.</p>
@@ -69,7 +72,7 @@
 
     <p>Every memory carries a confidence spread: one &sigma; per memory, stored as a diagonal over the embedding. Retrieval computes an ordinary hybrid score first:</p>
 
-    <pre><code>base = 0.50&middot;cosine + 0.15&middot;bm25 + 0.27&middot;recency + 0.08&middot;access_frequency</code></pre>
+    <pre><code class="language-plaintext">base = 0.50&middot;cosine + 0.15&middot;bm25 + 0.27&middot;recency + 0.08&middot;access_frequency</code></pre>
 
     <p>Dense vector search and FTS5 keyword search run in parallel and are fused by reciprocal rank fusion (k=60) before any of that is scored. A few smaller terms sit on top too, entity overlap, cluster cohesion, a temporal boost, but that's the shape of it.</p>
 
@@ -97,7 +100,7 @@
 
     <h2>Reading the block</h2>
 
-    <pre><code>[1.72] (cloudflare-project &uarr;/decision) 2mo ago &bull; Use Workers + D1 + Vectorize</code></pre>
+    <pre><code class="language-plaintext">[1.72] (cloudflare-project &uarr;/decision) 2mo ago &bull; Use Workers + D1 + Vectorize</code></pre>
 
     <p><code>1.72</code> is the final fused score: cosine, keyword, recency and access, already multiplied by the confidence term, which is why it can exceed 1. It's relevance with confidence folded in, and it's why a shaky memory can't rank high just by matching your words.</p>
 
@@ -117,7 +120,7 @@
 
     <p>One MCP server, same behavior in Claude Code, Cursor, OpenCode and Zed.</p>
 
-    <pre><code>git clone https://github.com/LohitJaga/gaussian-memory-worker
+    <pre><code class="language-bash">git clone https://github.com/LohitJaga/gaussian-memory-worker
 cd gaussian-memory-worker &amp;&amp; npm install
 npx gaussian-memory init</code></pre>
 
@@ -131,5 +134,8 @@ npx gaussian-memory init</code></pre>
     <a href="/">All posts</a>
   </footer>
 </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/bash.min.js"></script>
+<script>hljs.highlightAll();</script>
 </body>
 </html>
