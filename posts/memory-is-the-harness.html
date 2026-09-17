@@ -62,11 +62,9 @@
 
     <h2>Why "just add RAG" doesn't finish the job</h2>
 
-    <p>That was the first version. It half-worked.</p>
-
     <p>Semantic search is good when you know what you're asking. "What did I decide about session storage" retrieves correctly, because the query and the stored text share most of their meaning.</p>
 
-    <p>Real sessions don't open that way. They open with "where was I" or "what's left on the auth thing." Four words, no semantic anchor. Against a store of four thousand memories, those four words are roughly equidistant from everything you have ever worked on, so cosine similarity there isn't weak signal, it's noise.</p>
+    <p>Real sessions don't open that way. They open with "where was I" or "what's left on the auth thing." Four words, no semantic anchor. Against a store of four thousand memories, those four words are roughly equidistant from everything you have ever worked on, so cosine similarity there is just noise.</p>
 
     <p>On my own gold-set benchmark, a plain cosine baseline gets 38 percent recall on queries phrased that vaguely. The confidence-weighted version gets 83 percent. On queries with real semantic anchor, exact phrasing or a close paraphrase, cosine alone already does fine: 92 and 100 percent recall, and the confidence layer barely moves the number. The mechanism does nothing on precise queries and everything on the vague ones, which is exactly the gap I built it to close.</p>
 
@@ -80,7 +78,7 @@
 
     <p>Dense vector search and FTS5 keyword search run in parallel and are fused by reciprocal rank fusion (k=60) before any of that is scored. A few smaller terms sit on top too, entity overlap, cluster cohesion, a temporal boost, but that's the shape of it.</p>
 
-    <p>The part that isn't ordinary is what happens next. The base score gets multiplied by a <strong>Bhattacharyya term</strong> that compares the sharpness of the query's distribution against each candidate memory's, clamped to <code>[0.70, 1.40]</code>. A memory the system is still confident about gets boosted by up to 40%. In practice the multiplier rarely drops below about 0.87 on the data I've run through it, so day to day it behaves more like a boost than a penalty, even though the clamp technically allows one.</p>
+    <p>What happens next is different. The base score gets multiplied by a <strong>Bhattacharyya term</strong> that compares the sharpness of the query's distribution against each candidate memory's, clamped to <code>[0.70, 1.40]</code>. A memory the system is still confident about gets boosted by up to 40%. In practice the multiplier rarely drops below about 0.87 on the data I've run through it, so day to day it behaves more like a boost than a penalty, even though the clamp technically allows one.</p>
 
     <p>Three things move that distribution:</p>
 
@@ -94,7 +92,7 @@
 
     <h2>Contradictions get resolved, not accumulated</h2>
 
-    <p>A plain store keeps both versions of the cron job and lets them fight it out on wording. This one adjudicates.</p>
+    <p>A plain store keeps both versions of the cron job and lets them fight it out on wording. This one judges.</p>
 
     <p>A cheap pass flags candidate pairs: a negation flip, or a resolved/unresolved flip, between two memories that are already highly similar. It's tuned for recall and over-flags on purpose. A model call then judges the flagged pair: <code>supersedes</code>, <code>conflicts_with</code>, <code>extends</code>, or <code>compatible</code>, with a confidence and a written reason.</p>
 
@@ -106,11 +104,11 @@
 
     <pre><code class="language-plaintext">[1.72] (cloudflare-project &uarr;/decision) 2mo ago &bull; Use Workers + D1 + Vectorize</code></pre>
 
-    <p><code>1.72</code> is the final fused score: cosine, keyword, recency and access, already multiplied by the confidence term, which is why it can exceed 1. It's relevance with confidence folded in, and it's why a shaky memory can't rank high just by matching your words.</p>
+    <p><code>1.72</code> is the final fused score: cosine, keyword, recency, and access, multiplied by the confidence term, which is why it can exceed 1. A shaky memory doesn't earn that multiplier, so it can't rank high just by matching your words.</p>
 
     <p><code>cloudflare-project</code> is the project the memory formed in; memories stay scoped to their project unless you ask across projects. <code>&uarr;</code> is the confidence band: sharp, holding, or fading. <code>decision</code> is the memory type: choices and why, as against <code>procedural</code>, how things work around here.</p>
 
-    <p>The whole injected block runs around 700 tokens. It's a precision top-up, not a transcript dump.</p>
+    <p>The whole injected block runs around 700 tokens.</p>
 
     <h2>Edge-native, and yours</h2>
 
