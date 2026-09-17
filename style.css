@@ -51,6 +51,7 @@ article li{margin-bottom:6px}
 .post-demo{display:block;width:100%;max-width:640px;height:auto;margin-top:14px;border-radius:8px;border:1px solid var(--rule);background:#08090c}
 
 .intro{color:var(--ink-soft);max-width:62ch;margin:0 0 24px;font-size:15.5px;text-wrap:balance}
+.tagline{max-width:none;white-space:nowrap;font-size:clamp(11px,2.6vw,15.5px)}
 .intro a{color:var(--sharp)}
 
 .linklist{list-style:none;display:flex;gap:18px;padding:0;margin:0;
