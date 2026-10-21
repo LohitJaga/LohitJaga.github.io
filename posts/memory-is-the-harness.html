@@ -26,107 +26,109 @@
   </header>
 
   <h1>Memory Is the Harness: Probabilistic State for AI Coding Assistants</h1>
-  <div class="meta">September 2026 &middot; <a href="https://github.com/LohitJaga/gaussian-memory-worker">gaussian-memory-worker</a></div>
+  <div class="meta">September 2026, updated October 2026 &middot; <a href="https://github.com/LohitJaga/gaussian-memory-worker">gaussian-memory-worker</a></div>
 
   <article>
-    <p>I told Claude the cron job was fixed. Three weeks earlier I'd told it the job was broken. It stored both, weighted them identically, and handed back whichever one happened to sit closer in vector space to my next prompt.</p>
+    <p>Every time I start a new session with a coding agent, I have to re-explain my project. Claude Code and Codex can read the repo, but the repo doesn't say what I already tried and dropped, or what I decided last week and why. Some of that ends up in a commit message. Most of it lived in a terminal session that's gone. The model only knows what the harness around it hands it, and memory is the part my harness didn't have.</p>
 
-    <p>That's what memory looks like in the tools I've used, Claude Code, Cursor, the memory layers in Mem0 and Zep. They don't forget anything, that's actually the problem. Everything gets remembered equally, forever, with no sense of what's still true.</p>
+    <p>Gaussian Memory is the memory server I built for this issue. It runs as a Cloudflare Worker in your own account. Because it's an MCP server, it works with coding agents like Claude Code, Codex, Cursor, OpenCode and Zed, but it isn't limited to coding tools. Any agent that can call MCP tools can use it, and the repo includes a LangChain wrapper so you can plug it into an agent you build yourself.</p>
 
-    <p><strong>Gaussian Memory</strong> is an MCP server that gives Claude Code, Cursor, OpenCode and Zed persistent memory across sessions. It runs entirely inside your own Cloudflare account, on the free tier. It treats a memory not as a row in a document store but as an observation with a confidence distribution that moves.</p>
+    <p>In Claude Code and Codex, it runs through a <code>UserPromptSubmit</code> hook, which fires every time you send a prompt and before the agent starts working on it. The hook searches the memory store for anything related to what you typed and passes those memories to the agent along with your prompt, so the agent already knows the relevant history when it starts. The agent can also call the memory tools on its own, for example to save a decision or look something up mid-task.</p>
 
-    <p>Here's what it puts into context on a prompt as vague as "where was I":</p>
+    <p>The name comes from how each memory is stored. Along with its embedding, every memory has a σ that tracks how confident the system is in it. The σ gets smaller when a memory keeps getting used or repeated, and it grows when the memory goes untouched for a while.</p>
 
-    <pre><code class="language-plaintext">[1.72] (cloudflare-project &uarr;/decision) 2mo ago &bull; Use Workers + D1 + Vectorize. Alternatives considered: Supabase, Railway, self-hosted Postgres
-[1.50] (benchmark-project &uarr;/decision) 2w ago &bull; Retrieve hook 3.5-4.2s on Windows, blocks UserPromptSubmit. Cause still unidentified</code></pre>
+    <p>Storing memories is the straightforward part. The harder problems are finding the right memory when the prompt is vague, and knowing which memory is still true. This blog goes through both, using real data from my own store.</p>
 
-    <p>That's real output from my own store. I never prompted the second line and never tagged it as open, it's just sitting there waiting to be the landmine I step on at 2am.</p>
+    <h2>How a decision changed</h2>
 
-    <h2>The bottleneck moved</h2>
+    <p>In July I was tuning the threshold that decides when two topics in the store get merged into one. This is what the timeline tool returns when I ask it to walk through that:</p>
 
-    <p>In my own experience switching between Claude, a hosted GLM, and a quantized Llama running under an open harness, which model sits behind the editor matters less than it used to. All three hit the same wall.</p>
+    <pre><code class="language-plaintext">memory_timeline({ query: "domain classification threshold" })
 
-    <p>The bottleneck is state: giving an agent an accurate, evolving model of your system across hundreds of sessions without stuffing the context window with garbage.</p>
+── 2026-07 ──
+  2026-07-02 ● σ=0.22 · 2x   Changed domain classification threshold from 0.3 to a configurable value to address domain fragmentation
+  2026-07-02 ◑ σ=0.35 · 12x  [SUPERSEDED] Changed threshold from 0.3 to 0.6 because the 0.3 threshold resulted in 15 domains and the 0.6 threshold resulted in 6 domains
+  2026-07-02 ● σ=0.15 · 7x   [SUPERSEDED] Changed domain classification threshold from 0.3 to 0.6 to reduce domain fragmentation
+  2026-07-02 ● σ=0.15 · 11x  [SUPERSEDED] Changed domain classification threshold from 0.3 to 0.6 because the lower threshold led to domain fragmentation
+  2026-07-02 ● σ=0.01 · 6x   [SUPERSEDED] Changed domain threshold from 0.3 to 0.6 because the lower threshold resulted in 50 domains, exceeding the cap
+  2026-07-02 ● σ=0.18 · 3x   Reverted domain classification threshold from 0.6 to 0.3 due to over-merging of domains
+  2026-07-05 ● σ=0.15 · 62x  Switched domain classification → cluster_id because domain classification was unstable and gave wildly different results every time it was run</code></pre>
 
-    <p>Your repository tells the model what your code does. It doesn't tell it why. It contains nothing about:</p>
+    <p>The four <code>[SUPERSEDED]</code> lines are the same change, saved four times that afternoon in different words. The revert below them made all four out of date, and the contradiction judge compared it against each one and marked them replaced, at 93% to 99% confidence. They no longer come back in search, but they stay in the timeline, so you can still see what changed and when. Three days later I stopped relying on that threshold at all and moved to cluster IDs, which is the last line.</p>
 
-    <ul>
-      <li>the migration that is 60% done and breaks if anything touches it</li>
-      <li>the fix you tried in March that failed in production</li>
-      <li>the trade-off you settled at 2am and can still recite but never wrote down</li>
-    </ul>
+    <p>Each line shows the date, how confident the system is in the memory (<code>●</code> is sharp, <code>○</code> is fading, with the σ next to it), and how many times it has been retrieved.</p>
 
-    <p>Some of that reaches a commit message. Most of it lived in a terminal session that no longer exists. So every few days I typed it out again.</p>
+    <h2>Finding a past decision</h2>
 
-    <p>You can push the whole repo into context instead, if you feel like paying for it. That still only tells the model what the code <em>is</em>, and it never contains the March dead end.</p>
+    <p>Most of what I actually type is vague, like "where did you land on that" or "fix that thing". Those have almost nothing in common with the memory that answers them, so plain vector search mostly returns noise. Here's a real one against my store of about 7,900 memories:</p>
 
-    <h2>Why "just add RAG" doesn't finish the job</h2>
+    <pre><code class="language-plaintext">memory_retrieve({ query: "where did I land on the retrieval work" })
 
-    <p>Semantic search is good when you know what you're asking. "What did I decide about session storage" retrieves correctly, because the query and the stored text share most of their meaning.</p>
+[1.62] (gaussian-memory-project ↑/decision) 11d ago ● Decision: Final shipped Gaussian Memory retrieval results (live production worker, measured 2026-10-10 against plain cosine at about 10 results each, hand-labeled 53-query gold set). | Context: Pipeline: wide first stage + write-time expansions + previous-turn keywords + Jev listwise rerank over 80 + trim 10. Deployed 2026-10-09 (112de519), merge fix d4632c00. | Outcome: Recall 0.833 vs 0.623, MRR 0.797 vs 0.429 (+0.368 [0.265, 0.475]). Vague prompts recall 0.917 vs 0.667, MRR 0.764 vs 0.358. Multi-hop still the weak spot: recall 0.611 vs 0.361. On 250 real prompts replayed through the full hook: first injected memory useful 74% vs 53% before, useful in top 3 92% vs 77%, useful share 52% vs 33%, noise tokens in context -44%. Earlier research-stage numbers (MRR 0.53 -> 0.71 with a 0.03 cutoff) are superseded by these.
 
-    <p>Real sessions don't open that way. They open with "where was I" or "what's left on the auth thing." Four words, no semantic anchor. Against a store of four thousand memories, those four words are roughly equidistant from everything you have ever worked on, so cosine similarity there is just noise.</p>
+[1.49] (gaussian-memory-project ↑/decision) 11d ago ● Decision: Rejected retrieval ideas, all measured on the 53-query gold set with paired bootstrap CIs (ideas_real.txt): HyDE, pseudo-relevance feedback, raw cosine ranking, and a cross-encoder reranker. | Context: 2026-10-09, searching for what would fix vague-prompt retrieval before Jev. | Outcome: Old pipeline baseline: recall 0.711, MRR 0.525, 846 ms. HyDE: recall 0.711, MRR 0.523, 1231 ms (+385 ms for nothing). Cross-encoder bge-reranker-base over the same pool: recall 0.654, MRR 0.490, 1386 ms (slower and lost recall; vague recall 0.583 vs 0.833). PRF: recall 0.645 (hurt). Raw cosine: recall 0.720, MRR 0.539, n.s. None shipped.</code></pre>
 
-    <p>On my own gold-set benchmark, a plain cosine baseline gets 38 percent recall on queries phrased that vaguely. The confidence-weighted version gets 83 percent. On queries with real semantic anchor, exact phrasing or a close paraphrase, cosine alone already does fine: 92 and 100 percent recall, and the confidence layer barely moves the number. The mechanism does nothing on precise queries and everything on the vague ones, which is exactly the gap I built it to close.</p>
+    <p>The first result is the decision I saved when I shipped the new retrieval pipeline, with the numbers attached. The second is everything I tried before that and why none of it shipped. An agent that gets these two doesn't need me to explain where the work stands or what not to try again.</p>
 
-    <p>So something other than the embedding has to do the ranking.</p>
+    <p><code>1.62</code> is the score it was ranked by, <code>gaussian-memory-project</code> is the topic, the arrow is the confidence level, and <code>decision</code> is the memory type: a choice saved with its context, the alternatives and the outcome.</p>
 
-    <h2>Modeling memory as uncertainty</h2>
+    <h2>How a memory gets saved</h2>
 
-    <p>Every memory carries a confidence spread: one &sigma; per memory, stored as a diagonal over the embedding. That representation is what lets reinforcement, decay, and merging share a common state: confidence can contract, expand, or combine without ever rewriting the underlying memory. Retrieval computes an ordinary hybrid score first:</p>
+    <p>Most of the decisions happen at write time.</p>
 
-    <pre><code class="language-plaintext">base = 0.50&middot;cosine + 0.15&middot;bm25 + 0.27&middot;recency + 0.08&middot;access_frequency</code></pre>
+    <ol>
+      <li>The new note is embedded and compared to the closest existing memory in the same project.</li>
+      <li>If the two are close (cosine 0.80 or higher), Jev, a decision model from TypeSafe that runs on Workers AI, reads both and picks one of four answers. <code>same</code> means the same fact in different words. <code>update</code> means the same subject, but something changed, like a number, a date, a status or a plan. <code>adds_detail</code> means new information that doesn't change anything in the old note. <code>different</code> means they're about different things.</li>
+      <li>A <code>same</code> doesn't store anything new. The existing memory just gets more confident, and its text stays as it was so a shorter restatement can't overwrite a more detailed original. An <code>update</code> is stored and the old memory is flagged for the judge. <code>adds_detail</code> and <code>different</code> are stored on their own.</li>
+      <li>Every night, the contradiction judge works through the flagged memories and the near misses for up to three minutes. For each pair it decides <code>supersedes</code>, <code>conflicts_with</code>, <code>extends</code> or <code>compatible</code>, with a confidence. Only a confident supersede (0.8 or higher) between two memories in the same project hides the older one. When it does, the judge also checks close rewordings of the old memory, like the four in the timeline above.</li>
+      <li>The same nightly job has Llama 4 Scout write a few casual ways I might ask about each new memory later, plus some keywords, and adds them to the keyword index. That's how a vague "the auth thing" can match a memory that never says auth.</li>
+    </ol>
 
-    <p>Dense vector search and FTS5 keyword search run in parallel and are fused by reciprocal rank fusion (k=60) before any of that is scored. A few smaller terms sit on top too, entity overlap, cluster cohesion, a temporal boost, but that's the shape of it.</p>
+    <p>The mistake I cared most about avoiding was merging two different facts, because then one of them is just gone. On 160 labeled pairs, Jev got the relationship right 94% of the time and never merged two different facts. As the judge, it got 91% right on 120 pairs with known answers, against 86% for Llama 3.3 70B, at about a third of the latency.</p>
 
-    <p>What happens next is different. The base score gets multiplied by a <strong>Bhattacharyya term</strong> that compares the sharpness of the query's distribution against each candidate memory's, clamped to <code>[0.70, 1.40]</code>. A memory the system is still confident about gets boosted by up to 40%. In practice the multiplier rarely drops below about 0.87 on the data I've run through it, so day to day it behaves more like a boost than a penalty, even though the clamp technically allows one.</p>
+    <h2>How a memory gets found</h2>
 
-    <p>Three things move that distribution:</p>
+    <ol>
+      <li>A wide first pass. Vector search pulls the top 100, and keyword search runs over the memories and the phrases the nightly job wrote for them. The keyword query also includes words from the end of the agent's previous reply, so "fix that thing" picks up whatever "that thing" was.</li>
+      <li>A weighted score. The main terms are 0.70 vector similarity, 0.15 keyword match, 0.10 time since the memory was last used and 0.05 how often it's been used, plus smaller boosts for shared entities and dates. This is where σ comes in: when either the query or the memory has a high σ, a weaker match is penalized less, by a multiplier between 0.70x and 1.40x.</li>
+      <li>A rerank. Jev reads the prompt, the end of the previous reply and the top 80 candidates in one call and picks the most useful ones, about ten. Its top pick changed about a third of the time when I reversed the candidate order, so it runs both orders and averages them.</li>
+    </ol>
 
-    <p><strong>Reinforcement.</strong> Retrieve and confirm a memory and its &sigma; contracts toward a floor. The floor is adaptive: sparse domains hold a wider floor, so a handful of memories about a brand-new project can't collapse into false certainty.</p>
+    <p>The alternatives I tried before Jev are the second memory in the example above. Jev adds about 0.6 s per prompt.</p>
 
-    <p><strong>Decay.</strong> A nightly job widens &sigma; across the store. The step is divided by a stability term, <code>1 + ln(access_count + 1)</code>, so things you reference constantly barely move. A memory that has never been retrieved at all, and was stored more than seven days ago, takes that step three times over. Past a threshold it's dropped entirely.</p>
+    <h2>Does it work</h2>
 
-    <p><strong>Merging.</strong> When two memories are close enough in distribution space, they combine via a Kalman update instead of sitting as duplicates. Two independent observations of the same fact produce higher combined confidence than either had alone.</p>
+    <p>I wrote 53 questions against my own store and labeled which memories should come back for each. Then I ran them against the live deployment and against plain vector search, about ten results each.</p>
 
-    <p>On a precise query with strong word overlap, cosine and BM25 dominate and the multiplier barely registers. On "where was I," cosine is flat across the corpus, so the confidence term ends up being the only signal that still has an opinion. Even there it's bounded to a 40% lift, and the hard &sigma; ceiling does more of the real work than the multiplier does.</p>
+    <table>
+      <thead><tr><th></th><th>Plain vector search</th><th>Gaussian Memory</th></tr></thead>
+      <tbody>
+        <tr><td>Right memory found, all 53</td><td>62%</td><td>83%</td></tr>
+        <tr><td>Right memory found, 12 vague ones</td><td>67%</td><td>92%</td></tr>
+        <tr><td>Right memory found, multi-fact ones</td><td>36%</td><td>61%</td></tr>
+        <tr><td>How high it ranks (MRR, 1.0 is always first)</td><td>0.43</td><td>0.79</td></tr>
+      </tbody>
+    </table>
 
-    <h2>Contradictions get resolved, not accumulated</h2>
+    <p>I also replayed 250 real prompts from my own sessions through the full hook. The first memory it added to the context was useful 74% of the time, up from 53% with the pipeline before Jev, and a useful one was in the top three 92% of the time. The eval only lets the system see memories that existed before each prompt, so it can't do better by finding notes from the future.</p>
 
-    <p>A plain store keeps both versions of the cron job and lets them fight it out on wording. This one judges.</p>
+    <p>This is my own data, not a public benchmark. The vague set is only 12 questions, and questions where the answer is split across several memories are still the weak spot. The <a href="https://github.com/LohitJaga/gaussian-memory-worker/tree/main/bench">test harness is in the repo</a> if you want to run it on your own store.</p>
 
-    <p>A cheap pass flags candidate pairs: a negation flip, or a resolved/unresolved flip, between two memories that are already highly similar. It's tuned for recall and over-flags on purpose. A model call then judges the flagged pair: <code>supersedes</code>, <code>conflicts_with</code>, <code>extends</code>, or <code>compatible</code>, with a confidence and a written reason.</p>
+    <h2>Runs in your own account</h2>
 
-    <p>The verdict is stored as a relation between the two memories, with the reason attached. Neither text is rewritten and nothing is deleted, though a <code>supersedes</code> verdict stamps <code>valid_to</code> on the older memory, which retires it from retrieval. The row stays where it was, next to the verdict that replaced it. That beats a system that silently drops things and never tells you.</p>
+    <p>Everything runs in your own Cloudflare account. D1 holds the memories and their history, Vectorize handles vector search over 768-dimension BGE embeddings, and Workers AI runs the embeddings, the extraction and Jev. Jev bills through your AI Gateway credits at about $0.001 per prompt and is off until you turn it on. Everything else fits in the free tier for a few thousand memories. Nothing goes through me.</p>
 
-    <p>Zep and Mem0 both handle contradiction. Zep tracks validity intervals on graph edges and invalidates contradicted facts; Mem0 runs an add/update/delete pass at write time. The difference here is that confidence is continuous and lives inside the ranking function, rather than acting as a boolean validity flag applied at write time.</p>
+    <p>It's not fast. A reranked read takes about three seconds warm, and the hook runs three of them in parallel before the agent answers.</p>
 
-    <h2>Reading the block</h2>
+    <p>The hooks filter what gets captured. Read-only commands, routine git commands, installs and deploys are dropped, and they try to redact anything that looks like a credential before it's stored. Everything it keeps can be listed, edited and deleted.</p>
 
-    <pre><code class="language-plaintext">[1.72] (cloudflare-project &uarr;/decision) 2mo ago &bull; Use Workers + D1 + Vectorize</code></pre>
-
-    <p><code>1.72</code> is the final fused score: cosine, keyword, recency, and access, multiplied by the confidence term, which is why it can exceed 1. A shaky memory doesn't earn that multiplier, so it can't rank high just by matching your words.</p>
-
-    <p><code>cloudflare-project</code> is the project the memory formed in; memories stay scoped to their project unless you ask across projects. <code>&uarr;</code>/<code>&rarr;</code>/<code>&darr;</code> is the confidence band: sharp, holding, or fading. <code>decision</code> is the memory type: choices and why, as against <code>procedural</code>, how things work around here.</p>
-
-    <p>The whole injected block runs around 700 tokens.</p>
-
-    <h2>Edge-native, and yours</h2>
-
-    <p>Giving an assistant persistent memory shouldn't mean shipping your session transcripts to someone else's server.</p>
-
-    <p>Gaussian Memory deploys as a single Worker into your own Cloudflare account. D1 holds the memories, access metadata and confidence history. Vectorize handles dense search over 768-dimension BGE embeddings, fused with D1's FTS5 index for keyword search. Workers AI runs the embeddings, the extraction, and the judge. No third-party API sits anywhere in that path, there's no key to hand anyone, and nothing routes through me.</p>
-
-    <p>Capture is filtered before storage rather than after: read-only commands, git plumbing, installs and deploys are dropped, and it attempts to redact anything credential-shaped on the way in: bearer tokens, provider API keys, JWTs, URLs with inline credentials, <code>KEY=value</code> secrets, PEM blocks. That is pattern matching, not a guarantee; treat it as a safety net rather than a reason to be careless. Everything it kept is listable, editable and deletable.</p>
-
-    <h2>Get it</h2>
-
-    <p>One MCP server, same behavior in Claude Code, Cursor, OpenCode and Zed.</p>
+    <h2>Try it</h2>
 
     <pre><code class="language-bash">git clone https://github.com/LohitJaga/gaussian-memory-worker
 cd gaussian-memory-worker &amp;&amp; npm install
 npx gaussian-memory init</code></pre>
 
-    <p>The model in your editor will be a different model in six months. What carries over is whether it starts each session knowing your system or asking you to describe it again. I built this because I was tired of reintroducing myself to my own tools. It's the only thing on my machine that remembers March.</p>
+    <p>If you try it, I'd like to hear what breaks.</p>
 
     <p><a href="https://github.com/LohitJaga/gaussian-memory-worker">github.com/LohitJaga/gaussian-memory-worker</a></p>
   </article>
