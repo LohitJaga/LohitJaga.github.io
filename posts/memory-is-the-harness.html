@@ -31,9 +31,13 @@
   <article>
     <p>Every time I start a new session with a coding agent, I have to re-explain my project. Claude Code and Codex can read the repo, but the repo doesn't say what I already tried and dropped, or what I decided last week and why. Some of that ends up in a commit message. Most of it lived in a terminal session that's gone. The model only knows what the harness around it hands it, and memory is the part my harness didn't have.</p>
 
-    <p>Gaussian Memory is the memory server I built for that. It runs as a Cloudflare Worker in your own account and works with Claude Code, Codex, Cursor, OpenCode, Zed, and anything else that supports MCP. On every prompt, a hook looks up the relevant memories and adds them to the context. The agent can also call the memory tools directly. The name comes from how each memory is stored: an embedding plus a σ for how sure the system is about it. σ shrinks when a memory gets used or repeated and grows when it doesn't.</p>
+    <p>Gaussian Memory is the memory server I built for this issue. It runs as a Cloudflare Worker in your own account. Because it's an MCP server, it works with coding agents like Claude Code, Codex, Cursor, OpenCode and Zed, but it isn't limited to coding tools. Any agent that can call MCP tools can use it, and the repo includes a LangChain wrapper so you can plug it into an agent you build yourself.</p>
 
-    <p>Saving memories is the easy part. The two hard parts are finding the right one when the prompt is vague, and knowing which one is still true. This post goes through both using real data from my own store.</p>
+    <p>In Claude Code and Codex, it runs through a <code>UserPromptSubmit</code> hook, which fires every time you send a prompt and before the agent starts working on it. The hook searches the memory store for anything related to what you typed and passes those memories to the agent along with your prompt, so the agent already knows the relevant history when it starts. The agent can also call the memory tools on its own, for example to save a decision or look something up mid-task.</p>
+
+    <p>The name comes from how each memory is stored. Along with its embedding, every memory has a σ that tracks how confident the system is in it. The σ gets smaller when a memory keeps getting used or repeated, and it grows when the memory goes untouched for a while.</p>
+
+    <p>Storing memories is the straightforward part. The harder problems are finding the right memory when the prompt is vague, and knowing which memory is still true. This blog goes through both, using real data from my own store.</p>
 
     <h2>When a fact changes</h2>
 
