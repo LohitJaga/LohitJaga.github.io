@@ -88,7 +88,7 @@ judged      2026-07-07 14:50 UTC</code></pre>
     <p>A read goes through three steps:</p>
 
     <ol>
-      <li>A wide first pass. Vector search pulls the top 100, and keyword search runs over the memories and the phrases written for them at save time. The keyword query also includes words from the end of the agent's previous reply, so "fix that thing" picks up whatever "that thing" was.</li>
+      <li>A wide first pass. Vector search pulls the top 100, and keyword search runs over the memories and the phrases the nightly job wrote for them. The keyword query also includes words from the end of the agent's previous reply, so "fix that thing" picks up whatever "that thing" was.</li>
       <li>A weighted score. The main terms are 0.70 vector similarity, 0.15 keyword match, 0.10 time since the memory was last used and 0.05 how often it's been used, plus smaller boosts for shared entities and dates. This is where σ comes in. When either the query or the memory has a high σ, a weaker match is penalized less, by a multiplier between 0.70x and 1.40x. It's skipped when the top match is already near-verbatim. When I tested turning it off, before the rerank step below existed, the right memory ranked lower.</li>
       <li>A rerank. Jev reads the prompt, the end of the previous reply and the top 80 candidates in one call and picks the most useful ones, about ten. When I reversed the order of the candidates, its top pick changed about a third of the time, so it now runs both orders and averages them. If Jev takes longer than 2.5 seconds, it falls back to the first-pass order instead of making you wait.</li>
     </ol>
