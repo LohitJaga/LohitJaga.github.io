@@ -39,8 +39,13 @@ article strong{color:var(--ink);font-weight:600}
 article code{font-family:"IBM Plex Mono",monospace;font-size:.88em;background:var(--code-bg);padding:1px 5px;border-radius:3px;color:var(--ink)}
 article pre{background:var(--code-bg);border:1px solid var(--rule);border-radius:6px;padding:16px 18px;overflow-x:auto;
  font-family:"IBM Plex Mono",monospace;font-size:13.5px;line-height:1.7;margin:0 0 20px}
-article pre code{background:none;padding:0}
+article pre code,article pre code.hljs{background:none;padding:0}
 article ul{margin:0 0 18px;padding-left:22px;color:var(--ink-soft)}
+article ol{margin:0 0 18px;padding-left:22px;color:var(--ink-soft)}
+article pre code.language-plaintext{white-space:pre-wrap;word-break:break-word}
+article table{border-collapse:collapse;width:100%;margin:0 0 20px;font-size:15px;color:var(--ink-soft)}
+article th,article td{border-bottom:1px solid var(--rule);padding:8px 10px;text-align:left}
+article th{color:var(--ink);font-weight:600}
 article li{margin-bottom:6px}
 
 .postlist{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:4px}
