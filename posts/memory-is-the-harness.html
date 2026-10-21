@@ -41,36 +41,19 @@
 
     <h2>An example from my own store</h2>
 
-    <p>Gaussian Memory ranks results with a weighted score, and I've changed those weights a few times. On October 6, my agent saved this memory:</p>
+    <p>Gaussian Memory sorts memories into topics, and in July I was tuning the similarity threshold that decides when two topics get merged. On July 2, my agent saved this:</p>
 
-    <pre><code class="language-plaintext">stored 2026-10-06 &middot; hybrid-scoring-project
+    <pre><code class="language-plaintext">Changed domain classification threshold from 0.3 to 0.6 to reduce domain fragmentation</code></pre>
 
-Current retrieval weights are cosine 0.50 / BM25 0.15 / recency 0.27 / access frequency 0.08</code></pre>
+    <p>At 0.6 the classifier started lumping too many topics together, so I put it back. Fifty minutes later it saved this:</p>
 
-    <p>Two days later I changed them. I found 6,899 vectors in the search index that had no memory behind them, left over from delete bugs back in May and June. They were dragging down plain vector search, which threw off every comparison I had made against it. After deleting them I re-tuned the weights to 0.70 / 0.15 / 0.10 / 0.05. That change went into the code, but no memory about it ever got saved. So when I searched my store for the retrieval weights tonight, this was the first result, and it has been wrong for almost two weeks:</p>
+    <pre><code class="language-plaintext">Reverted domain classification threshold from 0.6 to 0.3 due to over-merging of domains</code></pre>
 
-    <pre><code class="language-plaintext">[1.23] (hybrid-scoring-project &uarr;/episodic) 14d ago &#9681; Current retrieval weights are cosine 0.50 / BM25 0.15 / recency 0.27 / access frequency 0.08</code></pre>
+    <p>Both memories are about the same setting and they disagree, so an agent asking what the threshold is could get either one. The contradiction judge compared the two and decided the newer one replaces the older one:</p>
 
-    <p>An agent reading that would confidently tell me the wrong numbers. So I saved the current fact:</p>
+    <pre><code class="language-plaintext">supersedes · confidence 0.99</code></pre>
 
-    <pre><code class="language-plaintext">stored 2026-10-21 &middot; hybrid-scoring-project
-
-Current retrieval weights are cosine 0.70 / BM25 0.15 / recency 0.10 / access frequency 0.05, changed on 2026-10-08 after deleting 6,899 orphan vectors</code></pre>
-
-    <p>Then I ran the contradiction judge on the new memory instead of waiting for the nightly run. It compared the new memory against its closest matches and wrote this row for the October 6 one:</p>
-
-    <pre><code class="language-plaintext">relation    supersedes
-confidence  1.00
-judge       Jev
-judged      2026-10-21 04:23 UTC</code></pre>
-
-    <p>The October 6 memory now has an end date, so it no longer shows up in search, but it's still in the database next to the verdict that replaced it. Asking "what are the current retrieval weights" now returns the new memory first:</p>
-
-    <pre><code class="language-plaintext">[1.29] (hybrid-scoring-project &rarr;/episodic) 1m ago &#9675; Current retrieval weights are cosine 0.70 / BM25 0.15 / recency 0.10 / access frequency 0.05, changed on 2026-10-08 after deleting 6,899 orphan vectors</code></pre>
-
-    <p>That line is exactly what the agent sees. <code>1.29</code> is the score it was ranked by, and <code>hybrid-scoring-project</code> is the topic it was sorted into. The arrow and the dot both show how confident the system is in the memory, on slightly different cutoffs, going from <code>&uarr;</code> <code>&#9679;</code> (confident) to <code>&darr;</code> <code>&#9675;</code> (fading). The new memory shows <code>&rarr;</code> <code>&#9675;</code> because it was saved a minute earlier and hasn't been used or repeated yet. <code>episodic</code> means it's a record of something that happened, as opposed to a decision or a note about how something works.</p>
-
-    <p>This example also shows two things that don't work yet. The save step should have caught the conflict on its own by having Jev mark the new memory as an update, which flags the old memory and queues the pair for the judge. It didn't, so the nightly judge would never have looked at this pair. And when I ran the judge, it also marked two loosely related memories as superseded with only 35% and 44% confidence, which hid them from search. I put those two back by hand. Both are in the "What's still wrong" section below.</p>
+    <p>The July 2 memory gets an end date and drops out of search, but it stays in the database next to the verdict. The same change had also been saved a few more times that afternoon in different words, like "Changed threshold from 0.3 to 0.6 because the 0.3 threshold resulted in 15 domains". The judge checked those against the revert too and retired four of them, at 84% to 96% confidence.</p>
 
     <h2>How a new memory gets saved</h2>
 
@@ -79,14 +62,14 @@ judged      2026-10-21 04:23 UTC</code></pre>
     <ol>
       <li>The new note is embedded and compared to the closest existing memory.</li>
       <li>If the two are close (cosine 0.80 or higher), Jev, a decision model from TypeSafe that runs on Workers AI, reads both and picks one of four answers. <code>same</code> means the same fact in different words. <code>update</code> means the same subject, but something changed, like a number, a date, a status or a plan. <code>adds_detail</code> means new information that doesn't change anything in the old note. <code>different</code> means they're about different things.</li>
-      <li>A <code>same</code> doesn't store anything new. The existing memory just gets more confident, and its text stays as it was so a shorter restatement can't overwrite a more detailed original. An <code>update</code> is stored and the old memory is flagged. From then on, reads show the old one with <code>[CONTRADICTED — re-evaluate]</code> in front and rank it lower, until the judge decides the new one replaces it. <code>adds_detail</code> and <code>different</code> are stored on their own.</li>
-      <li>Every night, the contradiction judge picks up to 20 queued memories (near misses from saving, or flagged ones once that queue is empty), finds candidates for each with vector and keyword search, and labels each pair <code>supersedes</code>, <code>conflicts_with</code>, <code>extends</code> or <code>compatible</code> with a confidence. Only <code>supersedes</code> hides the older memory.</li>
+      <li>A <code>same</code> doesn't store anything new. The existing memory just gets more confident, and its text stays as it was so a shorter restatement can't overwrite a more detailed original. An <code>update</code> is stored and the old memory is flagged. From then on, reads show the old one with <code>[CONTRADICTED — re-evaluate]</code> in front and rank it lower until the judge rules on the pair. A conflict or an unsure supersede keeps the tag. <code>adds_detail</code> and <code>different</code> are stored on their own.</li>
+      <li>Every night, the contradiction judge works through the memories that were flagged or came close to an existing one, for up to three minutes. For each pair it decides <code>supersedes</code>, <code>conflicts_with</code>, <code>extends</code> or <code>compatible</code>, with a confidence. Only a confident supersede (0.8 or higher) between two memories in the same project hides the older one. Weaker or cross-project verdicts are saved as <code>possible_supersede</code> and both memories stay searchable. When the judge does hide a memory, it also looks at close rewordings of it and retires the ones Jev says the new memory replaces too.</li>
       <li>The same nightly job has Llama 4 Scout write three casual ways I might ask about recent memories later, plus five keywords each, for up to 100 memories a night. Those go into the keyword index. That's how a vague "the auth thing" can match a memory that never says auth.</li>
     </ol>
 
     <p>The mistake I cared most about avoiding was merging two different facts, because then one of them is just gone. On 160 labeled pairs, Jev got the relationship right 94% of the time and never merged two different facts. If Jev is turned off or takes longer than a second, saving falls back to merging only near-verbatim repeats.</p>
 
-    <p>Jev also replaced Llama 3.3 70B as the judge. On 120 pairs with known answers, Jev got 91% right and Llama got 86%. Most of the gap is that Jev is better at not calling added detail a replacement, which matters because a wrong supersede hides a memory that was still true. It's also faster, about 330 ms per pair compared to 1.1 s. Llama is still there as the fallback. One tradeoff: Llama writes a sentence explaining each verdict, and Jev verdicts right now only store the label and the confidence.</p>
+    <p>Jev also replaced Llama 3.3 70B as the judge. On 120 pairs with known answers, Jev got 91% right and Llama got 86%. Most of the gap is that Jev is better at not calling added detail a replacement, which matters because a wrong supersede hides a memory that was still true. It's also faster, about 330 ms per pair compared to 1.1 s. Llama is still there as the fallback.</p>
 
     <h2>How a memory gets found</h2>
 
@@ -122,16 +105,6 @@ judged      2026-10-21 04:23 UTC</code></pre>
 
     <p>This is all my own data. I haven't run a public benchmark yet. The vague set is only 12 questions, so I wouldn't lean on that row too hard. Questions where the answer is split across several memories are still the weak spot. The <a href="https://github.com/LohitJaga/gaussian-memory-worker/tree/main/bench">test harness is in the repo</a> so you can run it on your own store, but the labeled questions aren't, because they're built from my personal memories.</p>
 
-    <h2>What's still wrong</h2>
-
-    <p>The judge is too eager to supersede. Any <code>supersedes</code> verdict hides the older memory, no matter how low the confidence is, which is how the two memories in the example above got hidden at 35% and 44%. It also doesn't check projects before comparing two memories, and once it retired a note from a different project because the two looked alike. Next I'm adding a confidence floor and a project check.</p>
-
-    <p>The judge also misses things. It only looks at memories that were flagged when saved or that came close to an existing memory, so a conflict the save step misses, like the weights example, never gets judged unless I run it by hand. It also handles 20 memories a night, and 2,244 near-miss pairs are waiting in its queue. Flagged memories only get picked up once that queue is empty, so right now they never do. Older notes that describe the same thing in different words slip through too. Searching for the weights still brings up a June memory with an older formula, 0.6 cosine, 0.25 recency and 0.15 access frequency, that the judge never linked to the new one.</p>
-
-    <p>Confidence also drifts. Every read reinforces whatever it returns, including the background lookups the hook does on every prompt, so the memories that get used a lot all end up at maximum confidence. 44% of my store is sitting there right now. My benchmark freezes the store, so it can't see this. I need a longer test to measure what it does to ranking over time.</p>
-
-    <p>It's also not fast. A reranked read takes about three seconds warm, and the hook runs three of them in parallel on every prompt before the agent answers.</p>
-
     <h2>Compared to Mem0</h2>
 
     <p>Mem0 wrote about managing time in memory in their In Context newsletter on October 20, and it's a good breakdown of the problem. They split it into two clocks: when something happened and when it was stored. When a new memory replaces an old one, Mem0 keeps both and marks the old one as superseded, and a default read still returns both unless you ask for <code>latest_only</code>. It also supports expiration dates, resolving phrases like "last weekend" against when the conversation happened, and searching as of a past date.</p>
@@ -143,6 +116,8 @@ judged      2026-10-21 04:23 UTC</code></pre>
     <h2>Runs in your own account</h2>
 
     <p>Everything runs in your own Cloudflare account. D1 holds the memories and their history, Vectorize handles vector search over 768-dimension BGE embeddings, and Workers AI runs the embeddings, the extraction and Jev. Jev bills through your AI Gateway credits at about $0.001 per prompt and is off until you turn it on. Everything else fits in the free tier for a few thousand memories, until you hit Vectorize's storage limit. Nothing goes through me.</p>
+
+    <p>It's not fast. A reranked read takes about three seconds warm, and the hook runs three of them in parallel before the agent answers.</p>
 
     <p>The hooks filter what gets captured. Read-only commands, routine git commands, installs and deploys are dropped, and they try to redact anything that looks like a credential, like bearer tokens, API keys, JWTs, URLs with passwords in them, <code>KEY=value</code> secrets and PEM blocks. It's regex, so it will miss things, and it only covers what the hooks capture, not notes the agent stores directly. Everything it keeps can be listed, edited and deleted.</p>
 
