@@ -56,7 +56,7 @@
 
     <p>The four <code>[SUPERSEDED]</code> lines are the same change, saved four times that afternoon in different words. The revert below them made all four out of date, and the contradiction judge compared it against each one and marked them replaced, at 93% to 99% confidence. They no longer come back in search, but they stay in the timeline, so you can still see what changed and when. Three days later I stopped relying on that threshold at all and moved to cluster IDs, which is the last line.</p>
 
-    <p>Each line shows the date, how confident the system is in the memory (<code>●</code> is sharp, <code>○</code> is fading, with the σ next to it), and how many times it has been retrieved.</p>
+    <p>Each line shows the date, how confident the system is in that memory (<code>●</code> is sharp, <code>○</code> is fading, with the σ next to it), and how many times it has been retrieved.</p>
 
     <h2>Finding a past decision</h2>
 
@@ -74,7 +74,7 @@
 
     <h2>How a memory gets saved</h2>
 
-    <p>Most of the decisions happen at write time.</p>
+    <p>Most of the work happens when a memory is saved, before anything is ever retrieved. Every new note goes through the same steps:</p>
 
     <ol>
       <li>The new note is embedded and compared to the closest existing memory in the same project.</li>
@@ -88,37 +88,39 @@
 
     <h2>How a memory gets found</h2>
 
+    <p>When the hook or the agent asks for memories, the search runs in three steps:</p>
+
     <ol>
       <li>A wide first pass. Vector search pulls the top 100, and keyword search runs over the memories and the phrases the nightly job wrote for them. The keyword query also includes words from the end of the agent's previous reply, so "fix that thing" picks up whatever "that thing" was.</li>
       <li>A weighted score. The main terms are 0.70 vector similarity, 0.15 keyword match, 0.10 time since the memory was last used and 0.05 how often it's been used, plus smaller boosts for shared entities and dates. This is where σ comes in: when either the query or the memory has a high σ, a weaker match is penalized less, by a multiplier between 0.70x and 1.40x.</li>
       <li>A rerank. Jev reads the prompt, the end of the previous reply and the top 80 candidates in one call and picks the most useful ones, about ten. Its top pick changed about a third of the time when I reversed the candidate order, so it runs both orders and averages them.</li>
     </ol>
 
-    <p>The alternatives I tried before Jev are the second memory in the example above. Jev adds about 0.6 s per prompt.</p>
+    <p>Before Jev, I tried a cross-encoder and HyDE, and the second memory in the example above is the record of why neither one shipped. Jev adds about 0.6 seconds to each prompt, which I think is worth it for getting the right memory back.</p>
 
     <h2>Does it work</h2>
 
-    <p>I wrote 53 questions against my own store and labeled which memories should come back for each. Then I ran them against the live deployment and against plain vector search, about ten results each.</p>
+    <p>To measure this, I wrote 53 questions against my own store and labeled which memories should come back for each one. Then I ran them against the live deployment and against plain vector search, with about ten results each. Recall is how often the right memory came back at all, and MRR is how high it ranked, where 1.0 means it was always the first result.</p>
 
     <table>
       <thead><tr><th></th><th>Plain vector search</th><th>Gaussian Memory</th></tr></thead>
       <tbody>
-        <tr><td>Right memory found, all 53</td><td>62%</td><td>83%</td></tr>
-        <tr><td>Right memory found, 12 vague ones</td><td>67%</td><td>92%</td></tr>
-        <tr><td>Right memory found, multi-fact ones</td><td>36%</td><td>61%</td></tr>
-        <tr><td>How high it ranks (MRR, 1.0 is always first)</td><td>0.43</td><td>0.79</td></tr>
+        <tr><td>Recall, all 53 questions</td><td>62%</td><td>83%</td></tr>
+        <tr><td>Recall, 12 vague questions</td><td>67%</td><td>92%</td></tr>
+        <tr><td>Recall, multi-fact questions</td><td>36%</td><td>61%</td></tr>
+        <tr><td>MRR</td><td>0.43</td><td>0.79</td></tr>
       </tbody>
     </table>
 
     <p>I also replayed 250 real prompts from my own sessions through the full hook. The first memory it added to the context was useful 74% of the time, up from 53% with the pipeline before Jev, and a useful one was in the top three 92% of the time. The eval only lets the system see memories that existed before each prompt, so it can't do better by finding notes from the future.</p>
 
-    <p>This is my own data, not a public benchmark. The vague set is only 12 questions, and questions where the answer is split across several memories are still the weak spot. The <a href="https://github.com/LohitJaga/gaussian-memory-worker/tree/main/bench">test harness is in the repo</a> if you want to run it on your own store.</p>
+    <p>This is all my own data, not a public benchmark. The vague set is only 12 questions, so I wouldn't lean on that row too hard, and questions where the answer is split across several memories are still the weak spot. The <a href="https://github.com/LohitJaga/gaussian-memory-worker/tree/main/bench">test harness is in the repo</a> if you want to run it on your own store.</p>
 
     <h2>Runs in your own account</h2>
 
     <p>Everything runs in your own Cloudflare account. D1 holds the memories and their history, Vectorize handles vector search over 768-dimension BGE embeddings, and Workers AI runs the embeddings, the extraction and Jev. Jev bills through your AI Gateway credits at about $0.001 per prompt and is off until you turn it on. Everything else fits in the free tier for a few thousand memories. Nothing goes through me.</p>
 
-    <p>It's not fast. A reranked read takes about three seconds warm, and the hook runs three of them in parallel before the agent answers.</p>
+    <p>The tradeoff is speed. A reranked read takes about three seconds warm, and the hook runs three of them in parallel before the agent answers, so every prompt waits on that.</p>
 
     <p>The hooks filter what gets captured. Read-only commands, routine git commands, installs and deploys are dropped, and they try to redact anything that looks like a credential before it's stored. Everything it keeps can be listed, edited and deleted.</p>
 
