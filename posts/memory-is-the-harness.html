@@ -39,35 +39,38 @@
 
     <p>Storing memories is the straightforward part. The harder problems are finding the right memory when the prompt is vague, and knowing which memory is still true. This blog goes through both, using real data from my own store.</p>
 
-    <h2>When a fact changes</h2>
+    <h2>An example from my own store</h2>
 
-    <p>In early July, the job that sorts my memories into topics was unstable. Every run landed on a different number of topics. On July 5 the system saved this:</p>
+    <p>Gaussian Memory ranks results with a weighted score, and I've changed those weights a few times. On October 6, my agent saved this memory:</p>
 
-    <pre><code class="language-plaintext">stored 2026-07-05 &middot; project
+    <pre><code class="language-plaintext">stored 2026-10-06 &middot; hybrid-scoring-project
 
-Decided to delay the July 1 Gaussian Memory ship — doesn't feel comfortable shipping with known bugs, especially the domain rebuild instability (classifier lands on wildly different domain counts run-to-run: 15/31/49/6/50; regrounding+merge fix implemented 2026-07-02 but Lohit's verdict was "domains still have major issues, i dont trust this at all," with both false-positive merges (ukg-system-project) and false-negative misses (w1/w4/w5-project not merging with w2/w3) at the same threshold). No new ship date set yet.</code></pre>
+Current retrieval weights are cosine 0.50 / BM25 0.15 / recency 0.27 / access frequency 0.08</code></pre>
 
-    <p>The fix was splitting topic labels and clusters into two separate mechanisms, after which the rebuild gave the same answer every run. On July 7 the system saved this:</p>
+    <p>Two days later I changed them. I found 6,899 vectors in the search index that had no memory behind them, left over from delete bugs back in May and June. They were dragging down plain vector search, which threw off every comparison I had made against it. After deleting them I re-tuned the weights to 0.70 / 0.15 / 0.10 / 0.05. That change went into the code, but no memory about it ever got saved. So when I searched my store for the retrieval weights tonight, this was the first result, and it has been wrong for almost two weeks:</p>
 
-    <pre><code class="language-plaintext">stored 2026-07-07 &middot; episodic
+    <pre><code class="language-plaintext">[1.23] (hybrid-scoring-project &uarr;/episodic) 14d ago &#9681; Current retrieval weights are cosine 0.50 / BM25 0.15 / recency 0.27 / access frequency 0.08</code></pre>
 
-The domain rebuild instability issue (wildly different domain counts run-to-run, false-positive/negative merges) that caused the July 1 ship delay is resolved as of 2026-07-05 — domain and cluster_id were split into separate mechanisms, rebuild is now deterministic and reproducible.</code></pre>
+    <p>An agent reading that would confidently tell me the wrong numbers. So I saved the current fact:</p>
 
-    <p>Now there are two memories about the same thing that disagree. A plain vector store keeps both, and when I ask whether the rebuild still works, whichever one ranks higher wins. The agent has no way to tell that one of them is out of date.</p>
+    <pre><code class="language-plaintext">stored 2026-10-21 &middot; hybrid-scoring-project
 
-    <p>What makes this pair tricky is that an embedding model doesn't see them as very similar. Their cosine similarity is under 0.70, so vector search alone never put them next to each other. What they share is words: domain, rebuild, instability. The contradiction judge looks for candidate pairs with both vector search and keyword search, and keyword search is what caught this one. This is the row it wrote:</p>
+Current retrieval weights are cosine 0.70 / BM25 0.15 / recency 0.10 / access frequency 0.05, changed on 2026-10-08 after deleting 6,899 orphan vectors</code></pre>
+
+    <p>Then I ran the contradiction judge on the new memory instead of waiting for the nightly run. It compared the new memory against its closest matches and wrote this row for the October 6 one:</p>
 
     <pre><code class="language-plaintext">relation    supersedes
-confidence  0.98
-reason      Memory B is a newer update that resolves the domain rebuild
-            instability issue mentioned in Memory A
-judged      2026-07-07 14:50 UTC</code></pre>
+confidence  1.00
+judge       Jev
+judged      2026-10-21 04:23 UTC</code></pre>
 
-    <p>Memory B is the July 7 one. The older memory gets an end date and stops showing up in search. Being replaced doesn't delete it, so the row and the verdict are still there if I want to see what changed. Asking today whether the domain rebuild is still unstable, the July 7 memory comes back and the July 5 one doesn't:</p>
+    <p>The October 6 memory now has an end date, so it no longer shows up in search, but it's still in the database next to the verdict that replaced it. Asking "what are the current retrieval weights" now returns the new memory first:</p>
 
-    <pre><code class="language-plaintext">[1.25] (gaussian-memory &uarr;/episodic) 3mo ago &#9679; The domain rebuild instability issue (wildly different domain counts run-to-run, false-positive/negative merges) that caused the July 1 ship delay is resolved as of 2026-07-05 — domain and cluster_id were split into separate mechanisms, rebuild is now deterministic and reproducible.</code></pre>
+    <pre><code class="language-plaintext">[1.29] (hybrid-scoring-project &rarr;/episodic) 1m ago &#9675; Current retrieval weights are cosine 0.70 / BM25 0.15 / recency 0.10 / access frequency 0.05, changed on 2026-10-08 after deleting 6,899 orphan vectors</code></pre>
 
-    <p>That line is exactly what the agent sees. <code>1.25</code> is the score it was ranked by. <code>gaussian-memory</code> is the topic it was sorted into. The arrow and the dot both show how sure the system is, on slightly different cutoffs: <code>&uarr;</code> <code>&rarr;</code> <code>&darr;</code> and <code>&#9679;</code> <code>&#9681;</code> <code>&#9675;</code> go from sure to fading. <code>episodic</code> means it's something that happened, as opposed to a decision or a note about how something works.</p>
+    <p>That line is exactly what the agent sees. <code>1.29</code> is the score it was ranked by, and <code>hybrid-scoring-project</code> is the topic it was sorted into. The arrow and the dot both show how confident the system is in the memory, on slightly different cutoffs, going from <code>&uarr;</code> <code>&#9679;</code> (confident) to <code>&darr;</code> <code>&#9675;</code> (fading). The new memory shows <code>&rarr;</code> <code>&#9675;</code> because it was saved a minute earlier and hasn't been used or repeated yet. <code>episodic</code> means it's a record of something that happened, as opposed to a decision or a note about how something works.</p>
+
+    <p>This example also shows two things that don't work yet. The save step should have caught the conflict on its own by having Jev mark the new memory as an update, which flags the old memory and queues the pair for the judge. It didn't, so the nightly judge would never have looked at this pair. And when I ran the judge, it also marked two loosely related memories as superseded with only 35% and 44% confidence, which hid them from search. I put those two back by hand. Both are in the "What's still wrong" section below.</p>
 
     <h2>How a new memory gets saved</h2>
 
@@ -83,7 +86,7 @@ judged      2026-07-07 14:50 UTC</code></pre>
 
     <p>The mistake I cared most about avoiding was merging two different facts, because then one of them is just gone. On 160 labeled pairs, Jev got the relationship right 94% of the time and never merged two different facts. If Jev is turned off or takes longer than a second, saving falls back to merging only near-verbatim repeats.</p>
 
-    <p>Jev also replaced Llama 3.3 70B as the judge. On 120 pairs with known answers, Jev got 91% right and Llama got 86%. Most of the gap is that Jev is better at not calling added detail a replacement, which matters because a wrong supersede hides a memory that was still true. It's also faster, about 330 ms per pair compared to 1.1 s. Llama is still there as the fallback, and it's the model that judged the July example, since Jev came in October. One tradeoff: Llama writes a sentence explaining each verdict, like the one above, and Jev verdicts right now only store the label and the confidence.</p>
+    <p>Jev also replaced Llama 3.3 70B as the judge. On 120 pairs with known answers, Jev got 91% right and Llama got 86%. Most of the gap is that Jev is better at not calling added detail a replacement, which matters because a wrong supersede hides a memory that was still true. It's also faster, about 330 ms per pair compared to 1.1 s. Llama is still there as the fallback. One tradeoff: Llama writes a sentence explaining each verdict, and Jev verdicts right now only store the label and the confidence.</p>
 
     <h2>How a memory gets found</h2>
 
@@ -121,7 +124,9 @@ judged      2026-07-07 14:50 UTC</code></pre>
 
     <h2>What's still wrong</h2>
 
-    <p>The judge doesn't check projects before comparing two memories. Of the 16 supersede verdicts in my store, only a few are real contradictions like the domain rebuild. Most are near-duplicates getting cleaned up, which is fine. But one retired a note from a different project because it looked like a new one. I haven't fixed that yet.</p>
+    <p>The judge is too eager to supersede. Any <code>supersedes</code> verdict hides the older memory, no matter how low the confidence is, which is how the two memories in the example above got hidden at 35% and 44%. It also doesn't check projects before comparing two memories, and once it retired a note from a different project because the two looked alike. Next I'm adding a confidence floor and a project check.</p>
+
+    <p>The judge also misses things. It only looks at memories that were flagged when saved or that came close to an existing memory, so a conflict the save step misses, like the weights example, never gets judged unless I run it by hand. It also handles 20 memories a night, and 2,244 near-miss pairs are waiting in its queue. Flagged memories only get picked up once that queue is empty, so right now they never do. Older notes that describe the same thing in different words slip through too. Searching for the weights still brings up a June memory with an older formula, 0.6 cosine, 0.25 recency and 0.15 access frequency, that the judge never linked to the new one.</p>
 
     <p>Confidence also drifts. Every read reinforces whatever it returns, including the background lookups the hook does on every prompt, so the memories that get used a lot all end up at maximum confidence. 44% of my store is sitting there right now. My benchmark freezes the store, so it can't see this. I need a longer test to measure what it does to ranking over time.</p>
 
