@@ -29,18 +29,16 @@
   <div class="meta">September 2026, updated October 2026 &middot; <a href="https://github.com/LohitJaga/gaussian-memory-worker">gaussian-memory-worker</a></div>
 
   <article>
-    <p>I told Claude the cron job was fixed. Three weeks earlier I'd told it the job was broken. It stored both, weighted them the same, and handed back whichever one sat closer in vector space to my next prompt.</p>
-
-    <p>That's how memory works in most of the tools I've used. Everything gets remembered equally, with no sense of what's still true.</p>
+    <p>In July, the job that groups my memories into topics was broken. Every run gave different results, and my assistant's memory had a note saying so: don't trust the output. A few days later I fixed it, and now there were two notes about the same thing that disagreed. A plain vector store keeps both and returns whichever one happens to sit closer to your next prompt.</p>
 
     <p><strong>Gaussian Memory</strong> is an MCP server that gives Claude Code, Cursor, Codex, OpenCode and Zed persistent memory across sessions. It runs entirely inside your own Cloudflare account. When you save something new, it checks what's already there and decides whether it's a repeat, an update, or something new. Memories you keep coming back to get more confident, and ones you never touch fade.</p>
 
-    <p>Tonight I typed "start the blog rewrite" with no other context. This is what it handed Claude before it answered:</p>
+    <p>Asking it today whether the rebuild is still broken returns this:</p>
 
-    <pre><code class="language-plaintext">[1.68] (job-schedule &rarr;/episodic) 6h ago &#9681; Moved blog rewrite to Wednesday, October 21, 2026
-[1.61] (gaussian-memory-project &rarr;/episodic) 9h ago &#9681; Decided to update the Gaussian Memory blog instead of writing a new post</code></pre>
+    <pre><code class="language-plaintext">[1.72] (domain-rebuild-project &uarr;/episodic) 3mo ago &bull; Changed domain rebuild status from unstable to current, exact, and done because user confirmed the fix
+[1.69] (domain-rebuild-project &uarr;/episodic) 3mo ago &bull; Fixed two bugs in domain rebuild: `targeted=false` param and rebuild continuation logic</code></pre>
 
-    <p>Both came from a conversation earlier that day. I didn't save either one on purpose, and Claude knew which post I meant without me saying it.</p>
+    <p>The old "it's broken" memory doesn't come back. When the fix was saved, the system marked it as replaced, so Claude gets the current state instead of two answers that disagree.</p>
 
     <h2>The bottleneck moved</h2>
 
@@ -76,29 +74,31 @@
 
     <h2>Then ranking</h2>
 
-    <p>Dense vector search and FTS5 keyword search run in parallel and get fused (reciprocal rank fusion, k=60). Then each candidate gets a hybrid score:</p>
+    <p>A read goes through three steps.</p>
+
+    <p><strong>1. Find candidates.</strong> Vector search and keyword search (SQLite FTS5) run in parallel, and their results are merged with reciprocal rank fusion.</p>
+
+    <p><strong>2. Score them.</strong> Each candidate gets a weighted score:</p>
 
     <pre><code class="language-plaintext">base = 0.70&middot;cosine + 0.15&middot;bm25 + 0.10&middot;recency + 0.05&middot;access_frequency</code></pre>
 
-    <p>The base score is multiplied by a Bhattacharyya term that compares the query's uncertainty with the memory's, clamped to <code>[0.70, 1.40]</code>. It only applies when the top match isn't already near-verbatim, since a clear match doesn't need help. This is where the confidence distribution shows up. It earns its place (removing it costs 0.04 to 0.05 MRR), but it's a smaller effect than I expected when I started.</p>
+    <p>That score is then multiplied by a Bhattacharyya term, clamped to <code>[0.70, 1.40]</code>, which compares how uncertain the query is with how uncertain the memory is. This is where the confidence model comes in. It's skipped when the top match is already near-verbatim, since a clear match doesn't need help. When I turned it off in testing, the right memory ranked lower.</p>
 
-    <p>Last, Jev reads the top 80 candidates along with the end of the assistant's previous reply and reorders them. The previous reply is what makes "fix that thing" resolvable, since the prompt alone doesn't say what "that" is. It runs twice with the candidates in opposite orders and averages the two, because a single call is sensitive to position. On the gold set this step alone took MRR from 0.52 to 0.76.</p>
+    <p><strong>3. Rerank.</strong> Jev reads the top 80 candidates along with the end of the assistant's previous reply and puts them in order. The previous reply is what makes "fix that thing" work, since the prompt alone doesn't say what "that" is. It runs twice with the candidates in opposite orders and averages the results, because a single call is sensitive to position. This step made the biggest difference of anything I tried: the right memory moved from around second place on average to near the top.</p>
 
-    <p>One thing I'm still working on: every retrieval reinforces whatever it returns, so heavily used memories collapse to the confidence floor (44% of rows sit there now), and recency starts measuring past exposure more than age. The frozen benchmark doesn't catch that. It needs a long-run test.</p>
+    <p>There's one problem I haven't solved yet. Every read reinforces whatever it returns, so the memories that get used a lot all end up at maximum confidence. 44% of my store is sitting there right now. My benchmark freezes the store, so it can't see this, and I need a longer test to measure it.</p>
 
     <h2>Compared to Mem0 and Zep</h2>
 
     <p>Both handle contradiction. Zep tracks validity intervals on graph edges and invalidates contradicted facts. Mem0 runs an LLM pass at write time that decides whether to add, update or delete. Mem0's recent post on managing time in memory splits it into two clocks, when something happened and when it was stored, which is a good way to think about it.</p>
 
-    <p>The differences here: the merge and supersede calls go to a dedicated decision model instead of a general LLM extraction prompt, nothing is ever deleted, and every verdict keeps its reason. The gap on my side is event time. Gaussian Memory assumes a memory was true around when it was written. That holds for coding agents, where you store things as they happen, and breaks on something like a bulk import of old notes.</p>
+    <p>The differences here: the merge and supersede calls go to a dedicated decision model instead of a general LLM extraction prompt, a replaced memory is kept rather than deleted, and every verdict keeps its reason. The gap on my side is event time. Gaussian Memory assumes a memory was true around when it was written. That holds for coding agents, where you store things as they happen, and breaks on something like a bulk import of old notes.</p>
 
     <h2>Reading the block</h2>
 
-    <p>Taking the first line from earlier:</p>
+    <pre><code class="language-plaintext">[1.69] (domain-rebuild-project &uarr;/episodic) 3mo ago &bull; Fixed two bugs in domain rebuild: `targeted=false` param and rebuild continuation logic</code></pre>
 
-    <pre><code class="language-plaintext">[1.68] (job-schedule &rarr;/episodic) 6h ago &#9681; Moved blog rewrite to Wednesday, October 21, 2026</code></pre>
-
-    <p><code>1.68</code> is the final score, which can go above 1 because of the confidence multiplier. <code>job-schedule</code> is the project it was saved under. The arrow is how confident the system is in it: <code>&uarr;</code> sharp, <code>&rarr;</code> holding, <code>&darr;</code> fading. <code>episodic</code> means it's something that happened, as opposed to a <code>decision</code> or a <code>procedural</code> note about how things work.</p>
+    <p><code>1.69</code> is the final score, which can go above 1 because of the confidence multiplier. <code>domain-rebuild-project</code> is the project it was saved under. The arrow is how confident the system is in it: <code>&uarr;</code> sharp, <code>&rarr;</code> holding, <code>&darr;</code> fading. <code>episodic</code> means it's something that happened, as opposed to a <code>decision</code> or a <code>procedural</code> note about how things work.</p>
 
     <h2>Runs in your own account</h2>
 
